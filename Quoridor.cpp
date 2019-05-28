@@ -1,9 +1,6 @@
 // Quoridor
-// Ultima modificación: 25/02/2019
-// Ultimas Adiciones: - Habilitadas la flechas direccionales.
-//                    - Cada jugador tiene unas teclas de movimiento asignadas.
-//                    - Los turnos ya no se pierden si presiona una tecla equivocada.
-//                    - El jugador puede visualizar su turno.
+// Ultima modificación: 26/02/2019
+// Ultimas Adiciones: - Los jugadores ya no se superponen
 
 // Librerias Incluidas
 #include <iostream>
@@ -52,7 +49,7 @@ struct Jugador
 }
 //            Cód    PosX   PosY
 Jugador_1 = {  P1  ,  10  ,  18  }, // Pos incial del jugador de arriba.
-Jugador_2 = {  P2  ,  10  ,  2   }; // Pos inicial del jugador de abajo.
+Jugador_2 = {  P2  ,  10  ,  02  }; // Pos inicial del jugador de abajo.
 
 // Prototipos de Función
 void Posicionar_jugadores();
@@ -61,9 +58,11 @@ void Mostrar_el_turno(int turno);
 void Limpiar_posiciones();
 void Siguiente_turno(int i);
 void leer_teclado(Jugador& Player, char& tecla);
-void Mover_Jugadores(Jugador& Player);
-bool Sin_ganadores();
+void Avanzar(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir, int Borde);
+void Mover_Jugadores(Jugador& Player, Jugador& Oponente);
 void Pantalla_del_ganador();
+bool Jugador_colindante(Jugador& Player, Jugador& Oponente, char Dir);
+bool Sin_ganadores();
 
 using namespace std;
 
@@ -128,26 +127,26 @@ void Siguiente_turno(int i)
 {
    if(i % 2 == 0) // Si i es par...
    {
-      Mover_Jugadores(Jugador_1);
+      Mover_Jugadores(Jugador_1, Jugador_2);
    }
    else
    {
-      Mover_Jugadores(Jugador_2);
+      Mover_Jugadores(Jugador_2, Jugador_1);
    }
 }
 
-// Cambia los valores de las posiciones de los jugadores con las teclas: w a s d
-void Mover_Jugadores(Jugador& Player)
+// Cambia los valores de las posiciones de los jugadores con el teclado
+void Mover_Jugadores(Jugador& Player, Jugador& Oponente)
 {
    char tecla;
    leer_teclado(Player, tecla); // Lee lo que ingresaremos por el teclado.
    switch(tecla)
-   {             // Si el jugador está en un borde, no avanza.
-      case 'w' : if(Player.posY-2 != 0 ) {Player.posY -= 2;} else Mover_Jugadores(Player) ; break; // Arriba
-      case 's' : if(Player.posY+2 != 20) {Player.posY += 2;} else Mover_Jugadores(Player) ; break; // Abajo
-      case 'a' : if(Player.posX-2 != 0 ) {Player.posX -= 2;} else Mover_Jugadores(Player) ; break; // Izquierda
-      case 'd' : if(Player.posX+2 != 20) {Player.posX += 2;} else Mover_Jugadores(Player) ; break; // Derecha
-      default  : Mover_Jugadores(Player) ;
+   {  //                                 Eje que cambia        Pared
+      case 'w' : Avanzar(Player, Oponente, Player.posY , UP    ,  0) ; break; // Arriba
+      case 's' : Avanzar(Player, Oponente, Player.posY , DOWN  , 20) ; break; // Abajo
+      case 'a' : Avanzar(Player, Oponente, Player.posX , LEFT  ,  0) ; break; // Izquierda
+      case 'd' : Avanzar(Player, Oponente, Player.posX , RIGHT , 20) ; break; // Derecha
+      default  : Mover_Jugadores(Player, Oponente) ;
    }
 }
 
@@ -170,6 +169,57 @@ void leer_teclado(Jugador& Player, char& tecla)
          case RIGHT : tecla = 'd'; break;
          default    : tecla = '0';
       }
+   }
+}
+
+// Mueve al jugador según su cercanía a una pared o a otro jugador.
+void Avanzar(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir, int Borde)
+{
+   int Un_Paso, Dos_Pasos;
+   if(Dir == DOWN || Dir == RIGHT)
+   {
+      Un_Paso   = Pos_Player + 2;
+      Dos_Pasos = Pos_Player + 4;
+   }
+   else
+   {
+      Un_Paso   = Pos_Player - 2;
+      Dos_Pasos = Pos_Player - 4;
+   }
+
+   if(Un_Paso != Borde) // ¿No hay pared al lado?
+   {
+      if(Jugador_colindante(Player, Oponente, Dir)) // ¿Hay jugadores juntos?
+      {
+         if(Dos_Pasos == Borde) // ¿Al lado del jugador colindante hay una pared?
+         {
+            Mover_Jugadores(Player, Oponente); // Tecla invalida, presione otra.
+         }
+         else
+         {
+            Pos_Player = Dos_Pasos; // Dar un salto de dos pasos.
+         }
+      }
+      else
+      {
+         Pos_Player = Un_Paso; // Dar un salto de un paso.
+      }
+   }
+   else
+   {
+      Mover_Jugadores(Player, Oponente); // Tecla invalida, presione otra.
+   }
+}
+
+// True si hay jugadores juntos.
+bool Jugador_colindante(Jugador& Player, Jugador& Oponente, char Dir)
+{
+   switch(Dir)
+   {  // Player y Oponente se sobreponen si...
+      case UP    : return Player.posX == Oponente.posX && Player.posY-2 == Oponente.posY;
+      case DOWN  : return Player.posX == Oponente.posX && Player.posY+2 == Oponente.posY;
+      case LEFT  : return Player.posY == Oponente.posY && Player.posX-2 == Oponente.posX;
+      case RIGHT : return Player.posY == Oponente.posY && Player.posX+2 == Oponente.posX;
    }
 }
 
