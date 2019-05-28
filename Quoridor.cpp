@@ -1,11 +1,10 @@
 // Quoridor
-// Ultima modificación: 08/03/2019
-// Ultimas Adiciones: - Los bloques no se salen y hay un límite de bloques.
+// Ultima modificación: 11/03/2019
+// Ultimas Adiciones: Un jugador no puede bloquear el paso del otro.
 
 // Librerias Incluidas
 #include <iostream>
 #include <cstdlib>
-#include <cmath>
 #include <conio.h>
 
 // Constantes
@@ -34,9 +33,10 @@ const char bC = '\333'; // Bloque Caracter .
 const char bS = '\260'; // Bloque Superpuesto.
 
 // Variables globales
-char Blok = '\0';
-char tecla = '\0'; // Guarda el caracter ASCII de la tecla que presionemos.
-char SaltoD = '\0';  // Determina si se puede hacer un salto diagonal y de qué tipo.
+char Blok = '\0';   // Guarda el tipo de colindancia que hay con otro bloque.
+char tecla = '\0';  // Guarda el caracter de la tecla que presionemos.
+char SaltoD = '\0'; // Guarda el tipo de salto diagonal que puede hacer un jugador.
+bool Salida = true; // True si los jugadores tienen al menos un camino para ganar.
 
 //                                   (1)           (2)           (3)           (4)          (5)           (6)           (7)           (8)           (9)
 // Matriz.                    0.     1.     2.     3.     4.     5.     6.     7.     8.    9.     10.    11.    12.    13.    14.    15.    16.    17.    18.
@@ -63,25 +63,25 @@ char matriz[alto][ancho] = {{'\332','\304','\302','\304','\302','\304','\302','\
 // Posición de los jugadores.
 struct Jugador
 {
-   char cod;
-   int posX;
-   int posY;
-   int Bloq;
+   char cod; // Caracter que representa al jugador.
+   int posX; // Posición horinzontal.
+   int posY; // Posición vertical.
+   int Bloq; // Número de bloques a su disposición.
 }
 //            Cod   PosX  PosY   Bloq
-Jugador_1 = {  P1  ,  5  ,  9  ,  10  }, // Pos incial del jugador de arriba.
-Jugador_2 = {  P2  ,  5  ,  1  ,  10  }; // Pos inicial del jugador de abajo.
+Jugador_1 = {  P1  ,  9  ,  17  ,  10  }, // Pos incial del jugador de arriba.
+Jugador_2 = {  P2  ,  9  ,  1   ,  10  }; // Pos inicial del jugador de abajo.
 
 // Posición de cada bloque.
 struct Bloquear
 {
    char Orientacion;
-   int posX1;
-   int posX2;
-   int posX3;
-   int posY1;
-   int posY2;
-   int posY3;
+   int posX1; // Posiciones
+   int posX2; // Horizontales
+   int posX3; //
+   int posY1; // Posiciones
+   int posY2; // Verticales
+   int posY3; //
 }
 //        Orientacion   posX1   posX2   posX3   posY1   posY2   posY3
 Bloque = {     b0     ,   0   ,   0   ,   0   ,   9   ,   0   ,   0  };
@@ -107,11 +107,13 @@ void Reiniciar_bloque();
 void Caracter_bloque(char& a, char& b, char& c);
 void Blo_Colindante(char Key);
 void Borrar_remanente();
+void Hallar_salida();
 char Tipo_De_BloColindante(char Key);
 char Determinar_diagonal(Jugador& Player, Jugador& Oponente);
-bool Bloque_Superpuesto();
 bool Ju_Colindante(Jugador& Player, Jugador& Oponente, char Dir);
+bool Bloque_Superpuesto();
 bool Sin_ganadores();
+bool hay_salida(char matrizAUX[alto][ancho], int posX, int posY, int posXaux, int posYaux, int meta, char jugador);
 
 using namespace std;
 
@@ -120,22 +122,22 @@ int main()
    for(int i=0; Sin_ganadores(); i++){ // El ciclo continua mientras no hayan ganadores.
 
       Posicionar_jugadores(); // Inserta las fichas de los jugadores en la matriz.
-      Posicionar_bloques();   // Inserta los bloques en la matriz.
       system("cls");          // Limpia la pantalla.
       Dibujar_matriz(i);      // Dibuja la nueva matriz.
       Limpiar_posiciones();   // Las fichas de los jugadores desaparecen de la matriz.
       Siguiente_turno(i);     // Cambia las posiciones de las fichas con el teclado según el turno.
+      Posicionar_bloques();   // Inserta los bloques en la matriz.
+      Hallar_salida();        // Determinar si los jugadores tienen al menos un camino para ganar.
    }
-
-   Pantalla_del_ganador();
+   Pantalla_del_ganador(); // Muestra un mensaje señalando al ganador de la partida.
    return 0;
 }
 
 // Agrega los caracteres que representan a cada jugador en la matriz.
 void Posicionar_jugadores()
 {
-   matriz[Jugador_1.posY * 2 - 1][Jugador_1.posX * 2 - 1] = P1;
-   matriz[Jugador_2.posY * 2 - 1][Jugador_2.posX * 2 - 1] = P2;
+   matriz[Jugador_1.posY][Jugador_1.posX] = P1;
+   matriz[Jugador_2.posY][Jugador_2.posX] = P2;
 }
 
 // Agrega los caracteres que representan a cada jugador en la matriz.
@@ -152,8 +154,8 @@ void Posicionar_bloques()
 // Agrega espacios vacios en las posiciones de los jugadores.
 void Limpiar_posiciones()
 {
-   matriz[Jugador_1.posY * 2 - 1][Jugador_1.posX * 2 - 1] = '\0';
-   matriz[Jugador_2.posY * 2 - 1][Jugador_2.posX * 2 - 1] = '\0';
+   matriz[Jugador_1.posY][Jugador_1.posX] = '\0';
+   matriz[Jugador_2.posY][Jugador_2.posX] = '\0';
 }
 
 // Hace aparecer un bloque de la nada.
@@ -224,7 +226,7 @@ void Limpiar_bloques()
    {
       pared = '\304'; // Solo pinta paredes horizontales.
    }
-   switch(Blok)
+   switch(Blok) // Según el tipo de colindancia.
    {
       case '1' : matriz[Bloque.posY1][Bloque.posX1] = pared;
                  matriz[Bloque.posY2][Bloque.posX2] = '\305';
@@ -280,25 +282,25 @@ void Caracter_bloque(char& a, char& b, char& c)
                     b = bC; // No Superpuesto.
                     c = bC; // No Superpuesto.
                     break;
-         case '4' : a = bC;
-                    b = bS;
-                    c = bC;
+         case '4' : a = bC; // No Superpuesto.
+                    b = bS; // Superpuesto.
+                    c = bC; // No Superpuesto.
                     break;
-         case '5' : a = bS;
-                    b = bS;
-                    c = bC;
+         case '5' : a = bS; // Superpuesto.
+                    b = bS; // Superpuesto.
+                    c = bC; // No Superpuesto.
                     break;
-         case '6' : a = bC;
-                    b = bS;
-                    c = bS;
+         case '6' : a = bC; // No Superpuesto.
+                    b = bS; // Superpuesto.
+                    c = bS; // Superpuesto.
                     break;
-         case '7' : a = bS;
-                    b = bC;
-                    c = bS;
+         case '7' : a = bS; // Superpuesto.
+                    b = bC; // No Superpuesto.
+                    c = bS; // Superpuesto.
                     break;
-         default  : a = bC;
-                    b = bC;
-                    c = bC;
+         default  : a = bC; // No Superpuesto.
+                    b = bC; // No Superpuesto.
+                    c = bC; // No Superpuesto.
                     break;
       }
    }
@@ -329,41 +331,52 @@ void Dibujar_matriz(int turno)
 // Muestra a quién le sigue el turno y las teclas que debe usar debajo del tablero.
 void Mostrar_el_turno(int turno)
 {
+   cout << "\n\nTurno de: ";
    if(turno % 2 == 0) // Si i es par...
    {
+      cout << P1 << "\tTeclas: ";
       if(SaltoD == '\0') // Si el salto diagonal NO está habilitado...
       {
-         cout << "\n\nTurno de: " << P1 << "\tTeclas:   w\n\t\t\ta s d\n";
+         cout <<"  w\n\t\t\ta s d\n";
       }
       else
       {
-         switch(SaltoD)
+         switch(SaltoD) // Según el tipo de salto diagonal que puede hacer un jugador P1.
          {
-            case UP    : cout << "\n\nTurno de: " << P1 << "\tTeclas: "<<L<<" w "<<R<<"\n\t\t\ta s d\n";            break;
-            case DOWN  : cout << "\n\nTurno de: " << P1 << "\tTeclas:   w\n\t\t\ta s d\n\t\t\t"<<L<<"   "<<R<<"\n"; break;
-            case LEFT  : cout << "\n\nTurno de: " << P1 << "\tTeclas: "<<L<<" w\n\t\t\ta s d\n\t\t\t"<<R<<"\n";     break;
-            case RIGHT : cout << "\n\nTurno de: " << P1 << "\tTeclas:   w 1\n\t\t\ta s d\n\t\t\t    "<<R<<"\n";     break;
-            case L     : cout << "\n\nTurno de: " << P1 << "\tTeclas: "<<L<<" w\n\t\t\ta s d\n";   break;
-            case R     : cout << "\n\nTurno de: " << P1 << "\tTeclas:   w "<<R<<"\n\t\t\ta s d\n"; break;
+            case 'A' : cout <<L<<" w "<<R<<"\n\t\t\ta s d\n";            break;
+            case 'B' : cout <<"  w\n\t\t\ta s d\n\t\t\t"<<L<<"   "<<R<<"\n"; break;
+            case 'C' : cout <<L<<" w\n\t\t\ta s d\n\t\t\t"<<R<<"\n";     break;
+            case 'D' : cout <<"  w 1\n\t\t\ta s d\n\t\t\t    "<<R<<"\n";     break;
+            case 'E' : cout <<"  w "<<R<<"\n\t\t\ta s d\n"; break;
+            case 'F' : cout <<L<<" w\n\t\t\ta s d\n";   break;
+            case 'G' : cout <<"  w\n\t\t\ta s d\n\t\t\t"<<L<<"\n"; break;
+            case 'H' : cout <<"  w\n\t\t\ta s d\n\t\t\t    "<<R<<"\n"; break;
+            case 'I' : cout <<L<<" w  \n\t\t\ta s d\n"; break;
+            case 'J' : cout <<"  w "<<R<<"\n\t\t\ta s d\n";   break;
          }
       }
    }
    else
    {
+      cout << P2 << "\tTeclas:  ";
       if(SaltoD == '\0') // Si el salto diagonal NO está habilitado...
       {
-      cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30\n\t\t\t<- \31 ->\n";
+      cout <<"  \30\n\t\t\t<- \31 ->\n";
       }
       else
       {
-         switch(SaltoD)
+         switch(SaltoD) // Según el tipo de salto diagonal que puede hacer un jugador P2.
          {
-            case UP    : cout << "\n\nTurno de: " << P2 << "\tTeclas:  "<<L<<" \30 "<<R<<"\n\t\t\t<- \31 ->\n";               break;
-            case DOWN  : cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30\n\t\t\t<- \31 ->\n\t\t\t "<<L<<"   "<<R<<"\n";   break;
-            case LEFT  : cout << "\n\nTurno de: " << P2 << "\tTeclas:  "<<L<<" \30\n\t\t\t<- \31 ->\n\t\t\t "<<R<<"\n";       break;
-            case RIGHT : cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30 "<<L<<"\n\t\t\t<- \31 ->\n\t\t\t     "<<R<<"\n"; break;
-            case L     : cout << "\n\nTurno de: " << P2 << "\tTeclas:  "<<L<<" \30\n\t\t\t<- \31 ->\n";   break;
-            case R     : cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30 "<<R<<"\n\t\t\t<- \31 ->\n"; break;
+            case 'A' : cout <<L<<" \30 "<<R<<"\n\t\t\t<- \31 ->\n";               break;
+            case 'B' : cout <<"  \30\n\t\t\t<- \31 ->\n\t\t\t "<<L<<"   "<<R<<"\n";   break;
+            case 'C' : cout <<L<<" \30\n\t\t\t<- \31 ->\n\t\t\t "<<R<<"\n";       break;
+            case 'D' : cout <<"  \30 "<<L<<"\n\t\t\t<- \31 ->\n\t\t\t     "<<R<<"\n"; break;
+            case 'E' : cout <<"  \30 "<<R<<"\n\t\t\t<- \31 ->\n"; break;
+            case 'F' : cout <<L<<" \30\n\t\t\t<- \31 ->\n";   break;
+            case 'G' : cout <<"  \30\n\t\t\t<- \31 ->\n\t\t\t "<<L<<"    \n"; break;
+            case 'H' : cout <<"  \30\n\t\t\t<- \31 ->\n\t\t\t     "<<R<<"\n"; break;
+            case 'I' : cout <<L<<" \30  \n\t\t\t<- \31 ->\n";  break;
+            case 'J' : cout <<"  \30 "<<R<<"\n\t\t\t<- \31 ->\n";  break;
          }
       }
    }
@@ -375,9 +388,17 @@ void Mostrar_el_turno(int turno)
    {
       if(Blok == '\0')
       {
-         cout << "\nPresione " << Gir << " para girar el bloque."
-                 "\nPresione " << Ent << " para anclar el bloque."
-                 "\nPresione " << Blo << " para mover su ficha.\n";
+         if(Salida)
+         {
+            cout << "\nPresione " << Gir << " para girar el bloque."
+                    "\nPresione " << Ent << " para anclar el bloque."
+                    "\nPresione " << Blo << " para mover su ficha.\n";
+         }
+         else
+         {
+            cout << "\nPresione " << Gir << " para girar el bloque."
+                    "\nPresione " << Blo << " para mover su ficha.\n";
+         }
       }
       else
       {
@@ -412,13 +433,13 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
       Leer_teclado(Player, tecla); // Lee lo que ingresaremos por el teclado.
       switch(tecla)
       {  //                                      Eje que cambia        Pared
-         case 'w' : Avance_Recto(Player, Oponente, Player.posY , UP    ,  0 , i) ; break; // Arriba
+         case 'w' : Avance_Recto(Player, Oponente, Player.posY , UP    , -1 , i) ; break; // Arriba
 
-         case 's' : Avance_Recto(Player, Oponente, Player.posY , DOWN  , 10 , i) ; break; // Abajo
+         case 's' : Avance_Recto(Player, Oponente, Player.posY , DOWN  , 19 , i) ; break; // Abajo
 
-         case 'a' : Avance_Recto(Player, Oponente, Player.posX , LEFT  ,  0 , i) ; break; // Izquierda
+         case 'a' : Avance_Recto(Player, Oponente, Player.posX , LEFT  , -1 , i) ; break; // Izquierda
 
-         case 'd' : Avance_Recto(Player, Oponente, Player.posX , RIGHT , 10 , i) ; break; // Derecha
+         case 'd' : Avance_Recto(Player, Oponente, Player.posX , RIGHT , 19 , i) ; break; // Derecha
 
          case Blo : if(Player.Bloq > 0)
                     {
@@ -519,11 +540,18 @@ void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i)
       {
          if(!Bloque_Superpuesto()) // Mientras el bloque no esté superpuesto...
          {
-            Player.Bloq--;
-            tecla = '\0'; // La condición if(tecla == Blo) en Mover_Jugadores dejará de cumplirse.
-            Reiniciar_bloque();
-            SaltoD = Determinar_diagonal(Player,Oponente); // Si el otro jugador estaba en una posición que
-         }                                                 // le permitía hacer un salto diagonal, aún podrá hacerlo.
+            if(Salida) // Si el bloque no encierra al jugador...
+            {
+               Player.Bloq--;
+               tecla = '\0'; // La condición if(tecla == Blo) en Mover_Jugadores dejará de cumplirse.
+               Reiniciar_bloque();
+               SaltoD = Determinar_diagonal(Player,Oponente); // Si el otro jugador estaba en una posición que
+            }                                                 // le permitía hacer un salto diagonal, aún podrá hacerlo.
+            else
+            {
+               return Mover_bloque(Player, Oponente, i);
+            }
+         }
          else
          {
             return Mover_bloque(Player, Oponente, i);
@@ -535,9 +563,9 @@ void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i)
             // Se borran los bloques de la matriz.
             if(Key == Gir) //  Si Key es igual a la tecla que gira el bloque...
             {
-               if(Bloque.Orientacion == bV && Bloque.posX1 == 16 // Si es un bloque vertival en la columna 17
+               if((Bloque.Orientacion == bV && Bloque.posX1 == 16) // Si es un bloque vertival en la columna 17
                   ||
-                  Bloque.Orientacion == bH && Bloque.posX1 == 1) // o horizontal en la columna 2...
+                  (Bloque.Orientacion == bH && Bloque.posX1 == 1)) // o horizontal en la columna 2...
                {
                   return Mover_bloque(Player, Oponente, i);      // No puede girar el bloque.
                }
@@ -751,6 +779,393 @@ void Blo_Colindante(char Key)
    }
 }
 
+// Mueve al jugador según su cercanía a una pared o a otro jugador.
+void Avance_Recto(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir, int Borde, int& i)
+{
+   // Esta parte ayuda a hacer el código polimorfico.
+   int Un_Paso, Dos_Pasos;
+   char bloque, PasoBl;
+   if(Dir == DOWN || Dir == RIGHT)
+   {
+      Un_Paso   = Pos_Player + 2;
+      Dos_Pasos = Pos_Player + 4;
+      if(Dir == DOWN)
+      {
+         bloque = matriz[Player.posY + 1][Player.posX];
+         PasoBl = matriz[Player.posY + 3][Player.posX];
+      }
+      else // RIGHT
+      {
+         bloque = matriz[Player.posY][Player.posX + 1];
+         PasoBl = matriz[Player.posY][Player.posX + 3];
+      }
+   }
+   else
+   {
+      Un_Paso   = Pos_Player - 2;
+      Dos_Pasos = Pos_Player - 4;
+      if(Dir == UP)
+      {
+         bloque = matriz[Player.posY - 1][Player.posX];
+         PasoBl = matriz[Player.posY - 3][Player.posX];
+      }
+      else // RIGHT
+      {
+         bloque = matriz[Player.posY][Player.posX - 1];
+         PasoBl = matriz[Player.posY][Player.posX - 3];
+      }
+   }
+
+   if(bloque != bC) // Si delante no haya un bloque...
+   {
+      if(Un_Paso != Borde) // Si no hay ninguna pared en frente...
+      {
+         if(Ju_Colindante(Player, Oponente, Dir)) // Si hay jugadores juntos...
+         {
+            if(Dos_Pasos == Borde) // ¿Al frente del jugador colindante hay una pared?
+            {
+               return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
+            }
+            else
+            {
+               if(PasoBl != bC) // Si delante del oponente no hay un bloque...
+               {
+                  Pos_Player = Dos_Pasos; // Dar un salto de dos pasos.
+               }
+               else
+               {
+                  return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
+               }
+            }
+         }
+         else
+         {
+            Pos_Player = Un_Paso; // Dar un salto de un paso.
+         }
+      }
+      else
+      {
+         return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
+      }
+   }
+   else
+   {
+      return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
+   }
+
+}
+
+// Mueve al jugador según el tipo de avance diagonal que puede hacer.
+void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
+{
+   if(SaltoD == 'A' || SaltoD == 'B') // Salto diagonal a la izquierda y derecha del oponente.
+   {
+      if(tecla == L) // Ir al lado izquierdo del oponente.
+      {
+         Player.posX = Oponente.posX - 2;
+         Player.posY = Oponente.posY;
+      }
+      else // (tecla == R) Ir al lado derecho del oponente.
+      {
+         Player.posX = Oponente.posX + 2;
+         Player.posY = Oponente.posY;
+      }
+   }
+   else
+   {
+      if(SaltoD == 'C' || SaltoD == 'D') // Salto diagonal hacia arriba y abajo del oponente.
+      {
+         if(tecla == L) // Ir al lado izquierdo del oponente.
+         {
+            Player.posX = Oponente.posX;
+            Player.posY = Oponente.posY - 2;
+         }
+         else // (tecla == R) Ir al lado derecho del oponente.
+         {
+            Player.posX = Oponente.posX;
+            Player.posY = Oponente.posY + 2;
+         }
+      }
+      else
+      {
+         switch(SaltoD)
+         {
+            case'E': if(tecla == R) // Salto diagonal a la derecha del oponente.
+                     {
+                        Player.posX = Oponente.posX + 2;
+                        Player.posY = Oponente.posY; break;
+                     }
+                     else // (tecla == L)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+            case'F': if(tecla == L) // Salto diagonal a la izquierda del oponente.
+                     {
+                        Player.posX = Oponente.posX - 2;
+                        Player.posY = Oponente.posY; break;
+                     }
+                     else // (tecla == R)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+            case'G': if(tecla == L) // Salto diagonal hacía abajo del oponente
+                     {
+                        Player.posX = Oponente.posX;
+                        Player.posY = Oponente.posY + 2; break;
+                     }
+                     else // (tecla == R)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+            case'H': if(tecla == R) // Salto diagonal hacia abajo del oponente
+                     {
+                        Player.posX = Oponente.posX;
+                        Player.posY = Oponente.posY + 2; break;
+                     }
+                     else // (tecla == L)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+            case'I': if(tecla == L) // Salto diagonal hacia arriba del oponente
+                     {
+                        Player.posX = Oponente.posX;
+                        Player.posY = Oponente.posY - 2; break;
+                     }
+                     else // (tecla == R)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+            case'J': if(tecla == R) // Salto diagonal hacia arriba del oponente
+                     {
+                        Player.posX = Oponente.posX;
+                        Player.posY = Oponente.posY - 2; break;
+                     }
+                     else // (tecla == L)
+                     {
+                        return Mover_Jugadores(Player, Oponente, i); // Volver a intentarlo.
+                     }
+         }
+      }
+   }
+}
+
+// Determina el tipo de anvace diagonal que puede hacer el siguiente jugador.
+char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
+{
+   if(Player.posY == 1 || matriz[Player.posY-1][Player.posX] == bC) // Si hay un bloque encima, o está en fila 1..
+   {
+      if(Ju_Colindante(Player, Oponente, DOWN)) // Si hay un jugador colindante abajo...
+      {
+         if(matriz[Player.posY+1][Player.posX] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if((matriz[Player.posY][Player.posX-1] == bC || matriz[Player.posY+1][Player.posX-2] == bC || matriz[Player.posY+2][Player.posX-1] == bC)
+               &&
+               (matriz[Player.posY][Player.posX+1] == bC || matriz[Player.posY+1][Player.posX+2] == bC || matriz[Player.posY+2][Player.posX+1] == bC))
+            {
+               return '\0'; // Si a los lados de los jugadores hay bloques, no se puede hace salto diagonal.
+            }                                                                                                       // Si está en una esquina superior izquierda...
+            if(Player.posX-2 == -1 || matriz[Player.posY][Player.posX-1] == bC || matriz[Player.posY+1][Player.posX-2] == bC || matriz[Player.posY+2][Player.posX-1] == bC)
+            {
+               if(matriz[Player.posY][Player.posX+1] == bC)
+               {
+                  return '\0';
+               }
+               else
+               {
+                  return 'E'; // Activar salto diagonal a la derecha del oponente.
+               }
+            }                                                                                                       // Si está en una esquina superior derecha...
+            if(Player.posX+2 == 19 || matriz[Player.posY][Player.posX+1] == bC || matriz[Player.posY+1][Player.posX+2] == bC || matriz[Player.posY+2][Player.posX+1] == bC)
+            {
+               if(matriz[Player.posY][Player.posX-1] == bC)
+               {
+                  return '\0';
+               }
+               else
+               {
+                  return 'F'; // Activar salto diagonal a la izquierda del oponente.
+               }
+            }
+            else
+            {
+               return 'A'; // Activar salto diagonal a la izquierda y derecha del oponente.
+            }
+         }
+         return '\0'; // No activar salto diagonal.
+      }
+      if(Ju_Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
+      {
+         if(matriz[Player.posY][Player.posX+1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY][Player.posX-1] == bC) // Si está en una esquina superior izquierda...
+            {
+               return 'G'; // Activar salto diagonal hacía abajo del oponente
+            }
+         }
+         return '\0';
+      }
+      if(Ju_Colindante(Player, Oponente, LEFT)) // Si hay un jugador colindante a la izquierda...
+      {
+         if(matriz[Player.posY][Player.posX-1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY][Player.posX+1] == bC) // Si está en una esquina superior derecha...
+            {
+               return 'H'; // Activar salto diagonal hacia abajo del oponente
+            }
+         }
+      }
+      return '\0'; // No activar salto diagonal.
+   }
+   if(Player.posY == 17 || matriz[Player.posY+1][Player.posX] == bC) // Si hay un bloque abajo, o está en fila 17...
+   {
+      if(Ju_Colindante(Player, Oponente, UP)) // Si hay un jugador colindante arriba...
+      {
+         if(matriz[Player.posY-1][Player.posX] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if((matriz[Player.posY][Player.posX-1] == bC || matriz[Player.posY-1][Player.posX-2] == bC || matriz[Player.posY-2][Player.posX-1] == bC)
+               &&
+               (matriz[Player.posY][Player.posX+1] == bC || matriz[Player.posY-1][Player.posX+2] == bC || matriz[Player.posY-2][Player.posX+1] == bC))
+            {
+               return '\0'; // No activar salto diagonal.
+            }                                                                                                       // Si está en la esquina inferior izquierda...
+            if(Player.posX-2 == -1 || matriz[Player.posY][Player.posX-1] == bC || matriz[Player.posY-1][Player.posX-2] == bC || matriz[Player.posY-2][Player.posX-1] == bC)
+            {
+               if(matriz[Player.posY][Player.posX+1] == bC)
+               {
+                  return '\0';
+               }
+               else
+               {
+                  return 'E'; // Activar salto diagonal a la derecha del oponente.
+               }
+            }                                                                                                       // Si está en la esquina inferior derecha...
+            if(Player.posX+2 == 19 || matriz[Player.posY][Player.posX+1] == bC || matriz[Player.posY-1][Player.posX+2] == bC || matriz[Player.posY-2][Player.posX+1] == bC)
+            {
+               if(matriz[Player.posY][Player.posX-1] == bC)
+               {
+                  return '\0';
+               }
+               else
+               {
+                  return 'F'; // Activar salto diagonal a la izquierda del oponente.
+               }
+            }
+            else
+            {
+               return 'B'; // Activar salto diagonal a la izquierda y derecha del oponente.
+            }
+         }
+         return '\0'; // No activar salto diagonal.
+      }
+      if(Ju_Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
+      {
+         if(matriz[Player.posY][Player.posX+1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY][Player.posX-1] == bC) // Si hay bloque a la izquierda...
+            {
+               return 'I'; // Activar salto diagonal hacia arriba del oponente
+            }
+         }
+         return '\0'; // No activar salto diagonal.
+      }
+      if(Ju_Colindante(Player, Oponente, LEFT)) // Si hay un jugador colindante a la izquierda...
+      {
+         if(matriz[Player.posY][Player.posX-1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY][Player.posX+1] == bC) // Si hay bloque a la derecha...
+            {
+               return 'J'; // Activar salto diagonal hacia arriba del oponente.
+            }
+         }
+      }
+      return '\0'; // No activar salto diagonal.
+   }
+   if(Player.posX == 1 || matriz[Player.posY][Player.posX-1] == bC) // Si hay un bloque a la izquierda o está en columna 1...
+   {
+      if(Ju_Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
+      {
+         if(matriz[Player.posY][Player.posX+1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY+1][Player.posX+2] == bC || matriz[Player.posY+2][Player.posX+1] == bC)
+            {
+               return 'I'; // Activar salto diagonal hacia arriba del oponente.
+            }
+            if(matriz[Player.posY-1][Player.posX+2] == bC || matriz[Player.posY-2][Player.posX+1] == bC)
+            {
+               return 'G'; // Activar salto diagonal hacía abajo del oponente.
+            }
+            return 'C'; // Activar salto diagonal hacia arriba y abajo del oponente.
+         }
+      }
+      return '\0'; // No activar salto diagonal.
+   }
+   if(Player.posX == 17 || matriz[Player.posY][Player.posX+1] == bC) // Si hay un bloque a la derecha o está en columna 17...
+   {
+      if(Ju_Colindante(Player, Oponente, LEFT)) // Si hay un jugador colindante a la izquierda...
+      {
+         if(matriz[Player.posY][Player.posX-1] != bC) // Si entre ambos jugadores no hay un bloque...
+         {
+            if(matriz[Player.posY+1][Player.posX-2] == bC || matriz[Player.posY+2][Player.posX-1] == bC)
+            {
+               return 'J'; // Activar salto diagonal hacia arriba del oponente.
+            }
+            if(matriz[Player.posY-1][Player.posX-2] == bC || matriz[Player.posY-2][Player.posX-1] == bC)
+            {
+               return 'H'; // Activar salto diagonal hacia abajo del oponente.
+            }
+            return 'D'; // Activar salto diagonal hacia arriba y abajo del oponente.
+         }
+      }
+   }
+   return '\0'; // No activar salto diagonal.
+}
+
+// True si hay jugadores juntos.
+bool Ju_Colindante(Jugador& Player, Jugador& Oponente, char Dir)
+{
+   switch(Dir)
+   {  // Player y Oponente se sobreponen si...
+      case UP    : return Player.posX == Oponente.posX && Player.posY-2 == Oponente.posY;
+
+      case DOWN  : return Player.posX == Oponente.posX && Player.posY+2 == Oponente.posY;
+
+      case LEFT  : return Player.posY == Oponente.posY && Player.posX-2 == Oponente.posX;
+   }
+ /* Case RIGHT */  return Player.posY == Oponente.posY && Player.posX+2 == Oponente.posX;
+}
+
+void Hallar_salida()
+{
+   // Crear copia de matriz;
+   char matrizAUX[alto][ancho];
+   for(int i=0; i<alto; i++)
+   {
+      for(int k=0; k<ancho; k++)
+      {
+         matrizAUX[i][k] = matriz[i][k];
+      }
+   } // Asignar a sálida el valor booleano de la disyuncion de hay_salida() de los 2 jugadores.
+   Salida = hay_salida(matrizAUX, Jugador_1.posX, Jugador_1.posY, Jugador_1.posX, Jugador_1.posY,  1, Jugador_1.cod)
+            &&
+            hay_salida(matrizAUX, Jugador_2.posX, Jugador_2.posY, Jugador_1.posX, Jugador_1.posY, 17, Jugador_2.cod);
+}
+
+// Backtracking, método para saber si un jugador a sido encerrado.
+bool hay_salida(char matrizAUX[alto][ancho], int posX, int posY, int posXaux, int posYaux, int meta, char jugador)
+{
+   if (posY<0 || posX<0 || posY>=alto || posX>=ancho) return false;
+   if (matrizAUX[posYaux][posXaux] == bC) return false;
+   if (matrizAUX[posY][posX] == jugador) return false;
+   if (posY == meta) return true;
+   matrizAUX[posY][posX] = jugador;
+   bool resp_clon1 = hay_salida(matrizAUX, posX  ,posY-2, posX  ,posY-1, meta, jugador);
+   bool resp_clon2 = hay_salida(matrizAUX, posX  ,posY+2, posX  ,posY+1, meta, jugador);
+   bool resp_clon3 = hay_salida(matrizAUX, posX+2,posY  , posX+1,posY  , meta, jugador);
+   bool resp_clon4 = hay_salida(matrizAUX, posX-2,posY  , posX-1,posY  , meta, jugador);
+   return resp_clon1 || resp_clon2 || resp_clon3 || resp_clon4;
+}
+
+// True si el bloque que controlamos está sobre otro.
 bool Bloque_Superpuesto()
 {
    if(matriz[Bloque.posY1][Bloque.posX1] != bC
@@ -767,185 +1182,10 @@ bool Bloque_Superpuesto()
    }
 }
 
-// Mueve al jugador según su cercanía a una pared o a otro jugador.
-void Avance_Recto(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir, int Borde, int& i)
-{
-   // Esta parte ayuda a hacer el código polimorfico.
-   int Un_Paso, Dos_Pasos;
-   if(Dir == DOWN || Dir == RIGHT)
-   {
-      Un_Paso   = Pos_Player + 1;
-      Dos_Pasos = Pos_Player + 2;
-   }
-   else
-   {
-      Un_Paso   = Pos_Player - 1;
-      Dos_Pasos = Pos_Player - 2;
-   }
-
-   if(Un_Paso != Borde) // ¿NO hay ninguna pared al frente?
-   {
-      if(Ju_Colindante(Player, Oponente, Dir)) // ¿Hay jugadores juntos?
-      {
-         if(Dos_Pasos == Borde) // ¿Al frente del jugador colindante hay una pared?
-         {
-            return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
-         }
-         else
-         {
-            Pos_Player = Dos_Pasos; // Dar un salto de dos pasos.
-         }
-      }
-      else
-      {
-         Pos_Player = Un_Paso; // Dar un salto de un paso.
-      }
-   }
-   else
-   {
-      return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
-   }
-}
-
-// Mueve al jugador según el tipo de avance diagonal que puede hacer.
-void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
-{
-   if(SaltoD == UP || SaltoD == DOWN)
-   {
-      if(tecla == L) // Ir al lado izquierdo del oponente.
-      {
-         Player.posX = Oponente.posX - 1;
-         Player.posY = Oponente.posY;
-      }
-      else // (tecla == R) Ir al lado derecho del oponente.
-      {
-         Player.posX = Oponente.posX + 1;
-         Player.posY = Oponente.posY;
-      }
-   }
-   else
-   {
-      if(SaltoD == LEFT || SaltoD == RIGHT)
-      {
-         if(tecla == L) // Ir al lado superior del oponente.
-         {
-            Player.posX = Oponente.posX;
-            Player.posY = Oponente.posY - 1;
-         }
-         else // (tecla == R) Ir al lado inferior del oponente.
-         {
-            Player.posX = Oponente.posX;
-            Player.posY = Oponente.posY + 1;
-         }
-      }
-      else
-      {
-         if(SaltoD == R)
-         {
-            if(tecla == R) // Ir al lado derecho del oponente.
-            {
-               Player.posX = Oponente.posX + 1;
-               Player.posY = Oponente.posY;
-            }
-            else // (tecla == L) Tecla invalida. Presionar otra.
-            {
-               return Mover_Jugadores(Player, Oponente, i);
-            }
-         }
-         else // Si SaltoD == L
-         {
-            if(tecla == L) // Ir al lado izquierdo del oponente.
-            {
-               Player.posX = Oponente.posX - 1;
-               Player.posY = Oponente.posY;
-            }
-            else // (tecla == R) Tecla invalida. Presionar otra.
-            {
-               return Mover_Jugadores(Player, Oponente, i);
-            }
-         }
-      }
-   }
-}
-
-// Determina el tipo de anvace diagonal que puede hacer el siguiente
-// jugador o le desabilita la posibilidad de hacerlo.
-char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
-{
-   if(Player.posY == 1) // Si el jugador está en la fila 1...
-   {
-      if(Ju_Colindante(Player, Oponente, DOWN)) // Si hay un jugador colindante abajo...
-      {
-         if(Player.posX-1 == 0) // Si está en la esquina superior izquierda...
-         {
-            return R; // Puede subir a la derecha del oponente.
-         }
-         if(Player.posX+1 == 10) // Si está en la esquina superior derecha...
-         {
-            return L; // Puede subir a la izquierda del oponente.
-         }
-         else
-         {
-            return UP; // Puede subir a la izquierda o derecha del oponente.
-         }
-      }
-      return '\0'; // NO puede hacer salto diagonal.
-   }
-   if(Player.posY == 9) // Si el jugador está en la fila 9...
-   {
-      if(Ju_Colindante(Player, Oponente, UP)) // Si hay un jugador colindante arriba...
-      {
-         if(Player.posX-1 == 0) // Si está en la esquina inferior izquierda...
-         {
-            return R; // Puede bajar a la derecha del oponente.
-         }
-         if(Player.posX+1 == 10) // Si está en la esquina inferior derecha...
-         {
-            return L; // Puede bajar a la izquierda del oponente.
-         }
-         else
-         {
-            return DOWN; // Puede bajar a la izquierda o derecha del oponente.
-         }
-      }
-      return '\0'; // NO puede hacer salto diagonal.
-   }
-   if(Player.posX == 1) // Si el jugador está en la columna 1...
-   {
-      if(Ju_Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
-      {
-         return LEFT; // Puede ir a la parte superior o inferior del oponente, a la izquierda de la pantalla.
-      }
-      return '\0'; // NO puede hacer salto diagonal.
-   }
-   if(Player.posX == 9)
-   {
-      if(Ju_Colindante(Player, Oponente, LEFT))
-      {
-         return RIGHT; // Puede ir a la parte superior o inferior del oponente, a la derecha de la pantalla.
-      }
-   }
-   return '\0'; // NO puede hacer salto diagonal.
-}
-
-// True si hay jugadores juntos.
-bool Ju_Colindante(Jugador& Player, Jugador& Oponente, char Dir)
-{
-   switch(Dir)
-   {  // Player y Oponente se sobreponen si...
-      case UP    : return Player.posX == Oponente.posX && Player.posY-1 == Oponente.posY;
-
-      case DOWN  : return Player.posX == Oponente.posX && Player.posY+1 == Oponente.posY;
-
-      case LEFT  : return Player.posY == Oponente.posY && Player.posX-1 == Oponente.posX;
-   }
- /* Case RIGHT */  return Player.posY == Oponente.posY && Player.posX+1 == Oponente.posX;
-}
-
-// Verifica si aún no hay ganadores
+// Verifica si aún no hay ganadores.
 bool Sin_ganadores()
 {
-   if((Jugador_1.posY == 1) || (Jugador_2.posY == 9)) // Los numeros son las posiciones en las
+   if((Jugador_1.posY == 1) || (Jugador_2.posY == 17)) // Los numeros son las posiciones en las
    {                                                   // que cada jugador gana.
       return false;
    }
