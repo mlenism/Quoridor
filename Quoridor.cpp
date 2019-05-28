@@ -1,8 +1,7 @@
 // Quoridor
-// Ultima modificación: 03/03/2019
-// Ultimas Adiciones: - Ahora es posible desplazar y girar un bloque.
-//                    - Se asignó una tecla para activar los movimientos del bloque.
-//                    - Se generó un mensaje debajo del tablero que dice cuando se ha activado dicha tecla.
+// Ultima modificación: 08/03/2019
+// Ultimas Adiciones: - Al poner o girar un bloque sobre otro, es último no se borra.
+//                    - No se puede presionar Ent mientras haya un bloque superpuesto.
 
 // Librerias Incluidas
 #include <iostream>
@@ -11,12 +10,10 @@
 #include <conio.h>
 
 // Constantes
-#define alto 21
-#define ancho 21
-#define P1 '\2'
-#define P2 '\1'
-#define bV '\333' // Orientacion Vertical
-#define bH '\334' // Orientacion Horizontal
+#define alto 21  // Filas de la matriz.
+#define ancho 21 // Columnas de la matriz.
+#define bV '1'   // Bloque Vertical.
+#define bH '2'   // Bloque Horizontal.
 
 // Teclas direccionales.
 const char UP = 72, DOWN = 80, LEFT = 75, RIGHT = 77;
@@ -27,11 +24,20 @@ const char R  = '3'; // Saltar diagonalmente a la derecha del oponente.
 
 // Teclas de manipulación de bloques.
 const char Blo = 'p'; // Activa los bloques.
-const char Gir = 'o'; // Activa los bloques.
+const char Gir = 'o'; // Hace girar a un bloque.
+const char Ent = 'l'; // Ancla un bloque.
+
+// Caracteres
+const char P1 = '\2';   // Player 1.
+const char P2 = '\1';   // Pkayer 2.
+const char b0 = '\0';   // Bloque Invisible.
+const char bC = '\333'; // Bloque Caracter .
+const char bS = '\260'; // Bloque Superpuesto.
 
 // Variables globales
-char Jump = '\0';  // Determina si se puede hacer un salto diagonal y de qué tipo.
+char Blok = '\0';
 char tecla = '\0'; // Guarda el caracter ASCII de la tecla que presionemos.
+char SaltoD = '\0';  // Determina si se puede hacer un salto diagonal y de qué tipo.
 
 //                                         (1)           (2)           (3)           (4)          (5)           (6)           (7)           (8)           (9)           (10)
 // Matriz.                    0.     1.     2.     3.     4.     5.     6.     7.     8.    9.     10.    11.    12.    13.    14.    15.    16.    17.    18.    19.    20.
@@ -80,7 +86,7 @@ struct Bloquear
    int posY3;
 }
 //        Orientacion   posX1   posX2   posX3   posY1   posY2   posY3
-Bloque = {     bV     ,   3   ,   0   ,   0   ,   8   ,   0   ,   0  };
+Bloque = {     b0     ,   1   ,   0   ,   0   ,   8   ,   0   ,   0  };
 
 // Prototipos de Función
 void Posicionar_jugadores();
@@ -98,9 +104,17 @@ void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i);
 void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i);
 void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i);
 void Pantalla_del_ganador();
+void Aparecer_bloque();
+void Reiniciar_bloque();
+void Caracter_bloque(char& a, char& b, char& c);
+void Blo_Colindante(char Key);
+void Borrar_remanente();
+char Tipo_De_BloColindante(char Key);
 char Determinar_diagonal(Jugador& Player, Jugador& Oponente);
-bool Colindante(Jugador& Player, Jugador& Oponente, char Dir);
+bool Bloque_Superpuesto();
+bool Ju_Colindante(Jugador& Player, Jugador& Oponente, char Dir);
 bool Sin_ganadores();
+
 using namespace std;
 
 int main()
@@ -129,10 +143,12 @@ void Posicionar_jugadores()
 // Agrega los caracteres que representan a cada jugador en la matriz.
 void Posicionar_bloques()
 {
+   char _1, _2, _3;
    Orientar_bloques();
-   matriz[Bloque.posY1][Bloque.posX1] = bV;
-   matriz[Bloque.posY2][Bloque.posX2] = bV;
-   matriz[Bloque.posY3][Bloque.posX3] = bV;
+   Caracter_bloque(_1,_2,_3);
+   matriz[Bloque.posY1][Bloque.posX1] = _1;
+   matriz[Bloque.posY2][Bloque.posX2] = _2;
+   matriz[Bloque.posY3][Bloque.posX3] = _3;
 }
 
 // Agrega espacios vacios en las posiciones de los jugadores.
@@ -142,48 +158,157 @@ void Limpiar_posiciones()
    matriz[Jugador_2.posY * 2][Jugador_2.posX * 2] = '\0';
 }
 
-void Limpiar_bloques()
+// Hace aparecer un bloque de la nada.
+void Aparecer_bloque()
 {
-   if(Bloque.Orientacion == bV)
-   {
-      matriz[Bloque.posY1][Bloque.posX1] = '\263';
-      matriz[Bloque.posY2][Bloque.posX2] = '\305';
-      matriz[Bloque.posY3][Bloque.posX3] = '\263';
-   }
-   else // Bloque.Orientacion == bH
-   {
-      matriz[Bloque.posY1][Bloque.posX1] = '\304';
-      matriz[Bloque.posY2][Bloque.posX2] = '\305';
-      matriz[Bloque.posY3][Bloque.posX3] = '\304';
-   }
+   SaltoD = '\0'; // Inhabilita el Salto diagonal desde que aparece el bloque.
+   Bloque.Orientacion = bV;
+   Blo_Colindante('d');
+   Bloque.posX1 = 3;
+   Bloque.posY1 = 8;
 }
 
-// Sirve para girar los bloques de acuerdo a su orientación.
+// Hace que Blok sea igual al tipo de remanete que Limpiar_bloques() debe borrar.
+void Borrar_remanente()
+{
+   Bloque.posX1+=2;
+   Orientar_bloques();
+   Blo_Colindante('a');
+   Bloque.posX1-=2;
+}
+
+// Desaparece el bloque que aún no ha sido anclado en el tablero.
+void Reiniciar_bloque()
+{
+   Bloque.Orientacion = b0;
+   Bloque.posX1 = 1;
+   Bloque.posY1 = 8;
+}
+
+// Sirve para girar un bloque según su orientación.
 void Orientar_bloques()
 {
-   if(Bloque.Orientacion == bV) // Si la orientacion es vertical.
+   if(Bloque.Orientacion == bV || Bloque.Orientacion == b0) // Si la orientacion es vertical.
    {
       if(Bloque.posY1 % 2 != 0) // Si es impar...
       {
          Bloque.posX1--;
-         Bloque.posY1++;
+         Bloque.posY1--;
       }
       Bloque.posX2 = Bloque.posX1;
       Bloque.posX3 = Bloque.posX1;
       Bloque.posY2 = Bloque.posY1+1;
       Bloque.posY3 = Bloque.posY1+2;
    }
-   else // Si es horinzontal.
+   else // Bloque.Orientacion == bH
    {
       if(Bloque.posY1 % 2 == 0) // Si es par...
       {
          Bloque.posX1++;
-         Bloque.posY1--;
+         Bloque.posY1++;
       }
       Bloque.posX2 = Bloque.posX1+1;
       Bloque.posX3 = Bloque.posX1+2;
       Bloque.posY2 = Bloque.posY1;
       Bloque.posY3 = Bloque.posY1;
+   }
+}
+
+// Borra la remanente del bloque que estamos manipulando.
+void Limpiar_bloques()
+{
+   char pared;
+   if(Bloque.Orientacion == bV)
+   {
+      pared = '\263'; // Solo pinta paredes verticales.
+   }
+   else // Bloque.Orientacion == bH
+   {
+      pared = '\304'; // Solo pinta paredes horizontales.
+   }
+   switch(Blok)
+   {
+      case '1' : matriz[Bloque.posY1][Bloque.posX1] = pared;
+                 matriz[Bloque.posY2][Bloque.posX2] = '\305';
+                 matriz[Bloque.posY3][Bloque.posX3] = bC;
+                 break;
+      case '2' : matriz[Bloque.posY1][Bloque.posX1] = bC;
+                 matriz[Bloque.posY2][Bloque.posX2] = bC;
+                 matriz[Bloque.posY3][Bloque.posX3] = bC;
+                 break;
+      case '3' : matriz[Bloque.posY1][Bloque.posX1] = bC;
+                 matriz[Bloque.posY2][Bloque.posX2] = '\305';
+                 matriz[Bloque.posY3][Bloque.posX3] = pared;
+                 break;
+      case '4' : matriz[Bloque.posY1][Bloque.posX1] = pared;
+                 matriz[Bloque.posY2][Bloque.posX2] = bC;
+                 matriz[Bloque.posY3][Bloque.posX3] = pared;
+                 break;
+      case '5' : matriz[Bloque.posY1][Bloque.posX1] = bC;
+                 matriz[Bloque.posY2][Bloque.posX2] = bC;
+                 matriz[Bloque.posY3][Bloque.posX3] = pared;
+                 break;
+      case '6' : matriz[Bloque.posY1][Bloque.posX1] = pared;
+                 matriz[Bloque.posY2][Bloque.posX2] = bC;
+                 matriz[Bloque.posY3][Bloque.posX3] = bC;
+                 break;
+      case '7' : matriz[Bloque.posY1][Bloque.posX1] = bC;
+                 matriz[Bloque.posY2][Bloque.posX2] = '\305';
+                 matriz[Bloque.posY3][Bloque.posX3] = bC;
+                 break;
+      default  : matriz[Bloque.posY1][Bloque.posX1] = pared;
+                 matriz[Bloque.posY2][Bloque.posX2] = '\305';
+                 matriz[Bloque.posY3][Bloque.posX3] = pared;
+                 break;
+   }
+}
+
+// Elije el caracter del que están hechos los bloques.
+void Caracter_bloque(char& a, char& b, char& c)
+{
+   if(Bloque.Orientacion == bV || Bloque.Orientacion == bH)
+   {
+      switch(Blok) // Dibuja el bloque según su tipo de superposicion.
+      {
+         case '1' : a = bC; // No Superpuesto.
+                    b = bC; // No Superpuesto.
+                    c = bS; // Superpuesto.
+                    break;
+         case '2' : a = bS; // Superpuesto.
+                    b = bS; // Superpuesto.
+                    c = bS; // Superpuesto.
+                    break;
+         case '3' : a = bS; // Superpuesto.
+                    b = bC; // No Superpuesto.
+                    c = bC; // No Superpuesto.
+                    break;
+         case '4' : a = bC;
+                    b = bS;
+                    c = bC;
+                    break;
+         case '5' : a = bS;
+                    b = bS;
+                    c = bC;
+                    break;
+         case '6' : a = bC;
+                    b = bS;
+                    c = bS;
+                    break;
+         case '7' : a = bS;
+                    b = bC;
+                    c = bS;
+                    break;
+         default  : a = bC;
+                    b = bC;
+                    c = bC;
+                    break;
+      }
+   }
+   else // El bloque queda escondido en una esquina del tablero.
+   {
+      a = '\263'; // Pared vertical.
+      b = '\303'; // Pared en cruz.
+      c = '\263'; // Pared vertical.
    }
 }
 
@@ -206,13 +331,13 @@ void Mostrar_el_turno(int turno)
 {
    if(turno % 2 == 0) // Si i es par...
    {
-      if(Jump == '\0') // Si el salto diagonal NO está habilitado...
+      if(SaltoD == '\0') // Si el salto diagonal NO está habilitado...
       {
          cout << "\n\nTurno de: " << P1 << "\tTeclas:   w\n\t\t\ta s d\n";
       }
       else
       {
-         switch(Jump)
+         switch(SaltoD)
          {
             case UP    : cout << "\n\nTurno de: " << P1 << "\tTeclas: "<<L<<" w "<<R<<"\n\t\t\ta s d\n";            break;
             case DOWN  : cout << "\n\nTurno de: " << P1 << "\tTeclas:   w\n\t\t\ta s d\n\t\t\t"<<L<<"   "<<R<<"\n"; break;
@@ -225,13 +350,13 @@ void Mostrar_el_turno(int turno)
    }
    else
    {
-      if(Jump == '\0') // Si el salto diagonal NO está habilitado...
+      if(SaltoD == '\0') // Si el salto diagonal NO está habilitado...
       {
       cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30\n\t\t\t<- \31 ->\n";
       }
       else
       {
-         switch(Jump)
+         switch(SaltoD)
          {
             case UP    : cout << "\n\nTurno de: " << P2 << "\tTeclas:  "<<L<<" \30 "<<R<<"\n\t\t\t<- \31 ->\n";               break;
             case DOWN  : cout << "\n\nTurno de: " << P2 << "\tTeclas:    \30\n\t\t\t<- \31 ->\n\t\t\t "<<L<<"   "<<R<<"\n";   break;
@@ -248,7 +373,17 @@ void Mostrar_el_turno(int turno)
    }
    else
    {
-      cout << "\nPresione " << Gir << " para girar el bloque.\nPresione " << Blo << " para mover su ficha.\n";
+      if(Blok == '\0')
+      {
+         cout << "\nPresione " << Gir << " para girar el bloque."
+                 "\nPresione " << Ent << " para anclar el bloque."
+                 "\nPresione " << Blo << " para mover su ficha.\n";
+      }
+      else
+      {
+         cout << "\nPresione " << Gir << " para girar el bloque."
+                 "\nPresione " << Blo << " para mover su ficha.\n";
+      }
    }
 }
 
@@ -270,7 +405,7 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
 {
    if(tecla == Blo)
    {
-      Mover_bloque(Player, Oponente, i);
+      return Mover_bloque(Player, Oponente, i);
    }
    else
    {
@@ -285,9 +420,9 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
 
          case 'd' : Avance_Recto(Player, Oponente, Player.posX , RIGHT , 10 , i) ; break; // Derecha
 
-         case Blo : i-- ; break;
+         case Blo : i-- ; return Aparecer_bloque();
 
-         case  L  : if(Jump != '\0') // SI el salto diagonal NO está desabilitado...
+         case  L  : if(SaltoD != '\0') // SI el salto diagonal NO está desabilitado...
                     {
                        Avance_Diagonal(Player, Oponente, i); // Avance diagonal a la izquierda.
                     }
@@ -297,7 +432,7 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
                     }
                     break;
 
-         case  R  : if(Jump != '\0') // SI el salto diagonal NO está desabilitado...
+         case  R  : if(SaltoD != '\0') // SI el salto diagonal NO está desabilitado...
                     {
                        Avance_Diagonal(Player, Oponente, i); // Avance diagonal a la derecha.
                     }
@@ -309,7 +444,7 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
 
          default  : return Mover_Jugadores(Player, Oponente, i); // Tecla invalida, presione otra.
       }
-      Jump = Determinar_diagonal(Player,Oponente); // Determinar el tipo de anvace diagonal que puede hacer el siguiente
+      SaltoD = Determinar_diagonal(Player,Oponente); // Determinar el tipo de anvace diagonal que puede hacer el siguiente
                                                    // jugador o desabilitarle la posibilidad de hacerlo.
    }
 }
@@ -335,6 +470,7 @@ void Leer_teclado(Jugador& Player, char& UNA_TECLA)
          case R     : break; // no
          case Blo   : break; // reemplaza
          case Gir   : break; // ninguno.
+         case Ent   : break; //
          default    : UNA_TECLA = '\0';
       }
    }
@@ -359,31 +495,225 @@ void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i)
    char Key;
    Leer_teclado(Player, Key);
 
-   if(Key != Blo) // Si Key es diferente de la tecla que activa los bloques...
+   if(Key == Blo) // Si presionó Blo de nuevo para desactivar los bloques sin perder turno...
    {
-      Limpiar_bloques(); // Se borran los bloques de la matriz.
-
-      if(Key == Gir) //  Si Key es igual a la tecla que gira el bloque...
+      Limpiar_bloques();
+      Reiniciar_bloque();
+      tecla = '\0'; // La condición if(tecla == Blo) en Mover_Jugadores dejará de cumplirse.
+      i--; // El turno no se pierde.
+      SaltoD = Determinar_diagonal(Oponente,Player); // Si el actual jugador estaba en una posición que
+                                                     // le permitía hacer un salto diagonal, aún podrá hacerlo.
+   }
+   else
+   {
+      if(Key == Ent)
       {
-         Cambiar_Orientacion();
+         if(!Bloque_Superpuesto()) // Mientras el bloque no esté superpuesto...
+         {
+            tecla = '\0'; // La condición if(tecla == Blo) en Mover_Jugadores dejará de cumplirse.
+            Reiniciar_bloque();
+            SaltoD = Determinar_diagonal(Player,Oponente); // Si el otro jugador estaba en una posición que
+         }                                                 // le permitía hacer un salto diagonal, aún podrá hacerlo.
+         else
+         {
+            return Mover_bloque(Player, Oponente, i);
+         }
       }
       else
       {
-         switch(Key) // Desplazar bloque.
          {
-            case 'w' : Bloque.posY1 -= 2; break;
-            case 's' : Bloque.posY1 += 2; break;
-            case 'a' : Bloque.posX1 -= 2; break;
-            case 'd' : Bloque.posX1 += 2; break;
-            default  : return Mover_bloque(Player, Oponente, i);
+            // Se borran los bloques de la matriz.
+            if(Key == Gir) //  Si Key es igual a la tecla que gira el bloque...
+            {
+               Limpiar_bloques();
+               Cambiar_Orientacion();
+               Borrar_remanente();
+            }
+            else
+            {
+               Limpiar_bloques();
+               Blo_Colindante(Key);
+               switch(Key) // Desplazar bloque.
+               {
+                  case 'w' : Bloque.posY1 -= 2; break;
+                  case 's' : Bloque.posY1 += 2; break;
+                  case 'a' : Bloque.posX1 -= 2; break;
+                  case 'd' : Bloque.posX1 += 2; break;
+                  default  : return Mover_bloque(Player, Oponente, i);
+               }
+            }
+            i--; // El jugador no perderá el turno cuando la matriz se vuelva a pintar.
          }
       }
-      i--; // Aseguramos que el jugador no perderá el turno cuando la matriz se vuelva a pintar.
    }
-   else // Si Key es igual a la tecla que activa los bloques...
-   {    // Significa que la presionó de nuevo porque quiere desactivar los bloques.
-      tecla = '\0'; // Esto hace que la condición if(tecla == Blo) en Mover_Jugadores deje de cumplirse.
-      return Mover_Jugadores(Player, Oponente, i);
+}
+
+// Retorna el tipo de bloque colindante a otro bloque.
+char Tipo_De_BloColindante(char Key)
+{
+   int _1, _2, _3, _4, _5, _6, pared;
+   if(Bloque.Orientacion == bV)
+   {
+      pared = '\263';
+   }
+   else // Bloque.Orientacion == bH
+   {
+      pared = '\304';
+   }
+   if(Key == 'w' || Key == 's')
+   {
+      if(Key == 'w')
+      {
+         _1 = Bloque.posY1-2;
+         _2 = Bloque.posY2-2;
+         _3 = Bloque.posY3-2;
+         _4 = Bloque.posX1;
+         _5 = Bloque.posX2;
+         _6 = Bloque.posX3;
+      }
+      else // Key == s
+      {
+         _1 = Bloque.posY1+2;
+         _2 = Bloque.posY2+2;
+         _3 = Bloque.posY3+2;
+         _4 = Bloque.posX1;
+         _5 = Bloque.posX2;
+         _6 = Bloque.posX3;
+      }
+   }
+   else // key == 'a' || key == 'd'
+   {
+      if(Key == 'a')
+      {
+         _1 = Bloque.posY1;
+         _2 = Bloque.posY2;
+         _3 = Bloque.posY3;
+         _4 = Bloque.posX1-2;
+         _5 = Bloque.posX2-2;
+         _6 = Bloque.posX3-2;
+      }
+      else // Key == d
+      {
+         _1 = Bloque.posY1;
+         _2 = Bloque.posY2;
+         _3 = Bloque.posY3;
+         _4 = Bloque.posX1+2;
+         _5 = Bloque.posX2+2;
+         _6 = Bloque.posX3+2;
+      }
+   }
+   if(matriz[_1][_4] == pared
+      &&
+      matriz[_2][_5] == '\305'
+      &&
+      matriz[_3][_6] == bC)
+   {
+      return '1'; // borrar, borrar, bloque
+   }
+   else
+   {
+      if(matriz[_1][_4] == bC
+         &&
+         matriz[_2][_5] == bC
+         &&
+         matriz[_3][_6] == bC)
+      {
+         return '2'; // no borrar nada
+      }
+      else
+      {
+         if(matriz[_1][_4] == bC
+            &&
+            matriz[_2][_5] == '\305'
+            &&
+            matriz[_3][_6] == pared)
+         {
+            return '3'; // bloque, borrar, borrar
+         }
+         else
+         {
+            if(matriz[_1][_4] == pared
+               &&
+               matriz[_2][_5] == bC
+               &&
+               matriz[_3][_6] == pared)
+            {
+               return '4'; // borrar, bloque, borrar
+            }
+            else // bV , '\305' , bV
+            {
+               if(matriz[_1][_4] == bC
+                  &&
+                  matriz[_2][_5] == bC
+                  &&
+                  matriz[_3][_6] == pared)
+               {
+                  return '5'; // bloque, bloque, borrar
+               }
+               else
+               {
+                  if(matriz[_1][_4] == pared
+                     &&
+                     matriz[_2][_5] == bC
+                     &&
+                     matriz[_3][_6] == bC)
+                  {
+                     return '6'; // blorrar, bloque, bloque
+                  }
+                  else // pared, pared, pared.
+                  {
+                     if(matriz[_1][_4] == bC
+                        &&
+                        matriz[_2][_5] == '\305'
+                        &&
+                        matriz[_3][_6] == bC)
+                     {
+                        return '7'; // bloque, borrar, bloque
+                     }
+                     else
+                     {
+                        return '\0'; // Borrar todo el bloque
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
+// Asigna a Blok el tipo de bloque colindante a otro bloque.
+void Blo_Colindante(char Key)
+{
+   switch(Key)
+   {  // Player y Oponente se sobreponen si...
+      case 'w'  : Blok = Tipo_De_BloColindante(Key);
+                  break;
+
+      case 's'  : Blok = Tipo_De_BloColindante(Key);
+                  break;
+
+      case 'a'  : Blok = Tipo_De_BloColindante(Key);
+                  break;
+
+      case 'd'  : Blok = Tipo_De_BloColindante(Key);
+                  break;
+   }
+}
+
+bool Bloque_Superpuesto()
+{
+   if(matriz[Bloque.posY1][Bloque.posX1] != bC
+      ||
+      matriz[Bloque.posY2][Bloque.posX2] != bC
+      ||
+      matriz[Bloque.posY3][Bloque.posX3] != bC)
+   {
+      return true;
+   }
+   else
+   {
+      return false;
    }
 }
 
@@ -405,7 +735,7 @@ void Avance_Recto(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir,
 
    if(Un_Paso != Borde) // ¿NO hay ninguna pared al frente?
    {
-      if(Colindante(Player, Oponente, Dir)) // ¿Hay jugadores juntos?
+      if(Ju_Colindante(Player, Oponente, Dir)) // ¿Hay jugadores juntos?
       {
          if(Dos_Pasos == Borde) // ¿Al frente del jugador colindante hay una pared?
          {
@@ -430,7 +760,7 @@ void Avance_Recto(Jugador& Player, Jugador& Oponente, int& Pos_Player, char Dir,
 // Mueve al jugador según el tipo de avance diagonal que puede hacer.
 void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
 {
-   if(Jump == UP || Jump == DOWN)
+   if(SaltoD == UP || SaltoD == DOWN)
    {
       if(tecla == L) // Ir al lado izquierdo del oponente.
       {
@@ -445,7 +775,7 @@ void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
    }
    else
    {
-      if(Jump == LEFT || Jump == RIGHT)
+      if(SaltoD == LEFT || SaltoD == RIGHT)
       {
          if(tecla == L) // Ir al lado superior del oponente.
          {
@@ -460,7 +790,7 @@ void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
       }
       else
       {
-         if(Jump == R)
+         if(SaltoD == R)
          {
             if(tecla == R) // Ir al lado derecho del oponente.
             {
@@ -472,7 +802,7 @@ void Avance_Diagonal(Jugador& Player, Jugador& Oponente, int& i)
                return Mover_Jugadores(Player, Oponente, i);
             }
          }
-         else // Si Jump == L
+         else // Si SaltoD == L
          {
             if(tecla == L) // Ir al lado izquierdo del oponente.
             {
@@ -494,7 +824,7 @@ char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
 {
    if(Player.posY == 1) // Si el jugador está en la fila 1...
    {
-      if(Colindante(Player, Oponente, DOWN)) // Si hay un jugador colindante abajo...
+      if(Ju_Colindante(Player, Oponente, DOWN)) // Si hay un jugador colindante abajo...
       {
          if(Player.posX-1 == 0) // Si está en la esquina superior izquierda...
          {
@@ -513,7 +843,7 @@ char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
    }
    if(Player.posY == 9) // Si el jugador está en la fila 9...
    {
-      if(Colindante(Player, Oponente, UP)) // Si hay un jugador colindante arriba...
+      if(Ju_Colindante(Player, Oponente, UP)) // Si hay un jugador colindante arriba...
       {
          if(Player.posX-1 == 0) // Si está en la esquina inferior izquierda...
          {
@@ -532,7 +862,7 @@ char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
    }
    if(Player.posX == 1) // Si el jugador está en la columna 1...
    {
-      if(Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
+      if(Ju_Colindante(Player, Oponente, RIGHT)) // Si hay un jugador colindante a la derecha...
       {
          return LEFT; // Puede ir a la parte superior o inferior del oponente, a la izquierda de la pantalla.
       }
@@ -540,7 +870,7 @@ char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
    }
    if(Player.posX == 9)
    {
-      if(Colindante(Player, Oponente, LEFT))
+      if(Ju_Colindante(Player, Oponente, LEFT))
       {
          return RIGHT; // Puede ir a la parte superior o inferior del oponente, a la derecha de la pantalla.
       }
@@ -549,15 +879,17 @@ char Determinar_diagonal(Jugador& Player, Jugador& Oponente)
 }
 
 // True si hay jugadores juntos.
-bool Colindante(Jugador& Player, Jugador& Oponente, char Dir)
+bool Ju_Colindante(Jugador& Player, Jugador& Oponente, char Dir)
 {
    switch(Dir)
    {  // Player y Oponente se sobreponen si...
       case UP    : return Player.posX == Oponente.posX && Player.posY-1 == Oponente.posY;
+
       case DOWN  : return Player.posX == Oponente.posX && Player.posY+1 == Oponente.posY;
+
       case LEFT  : return Player.posY == Oponente.posY && Player.posX-1 == Oponente.posX;
-      case RIGHT : return Player.posY == Oponente.posY && Player.posX+1 == Oponente.posX;
    }
+ /* Case RIGHT */  return Player.posY == Oponente.posY && Player.posX+1 == Oponente.posX;
 }
 
 // Verifica si aún no hay ganadores
