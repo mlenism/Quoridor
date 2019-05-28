@@ -1,7 +1,6 @@
 // Quoridor
 // Ultima modificación: 08/03/2019
-// Ultimas Adiciones: - Al poner o girar un bloque sobre otro, es último no se borra.
-//                    - No se puede presionar Ent mientras haya un bloque superpuesto.
+// Ultimas Adiciones: - Los bloques no se salen y hay un límite de bloques.
 
 // Librerias Incluidas
 #include <iostream>
@@ -10,8 +9,8 @@
 #include <conio.h>
 
 // Constantes
-#define alto 21  // Filas de la matriz.
-#define ancho 21 // Columnas de la matriz.
+#define alto 19  // Filas de la matriz.
+#define ancho 19 // Columnas de la matriz.
 #define bV '1'   // Bloque Vertical.
 #define bH '2'   // Bloque Horizontal.
 
@@ -39,29 +38,27 @@ char Blok = '\0';
 char tecla = '\0'; // Guarda el caracter ASCII de la tecla que presionemos.
 char SaltoD = '\0';  // Determina si se puede hacer un salto diagonal y de qué tipo.
 
-//                                         (1)           (2)           (3)           (4)          (5)           (6)           (7)           (8)           (9)           (10)
-// Matriz.                    0.     1.     2.     3.     4.     5.     6.     7.     8.    9.     10.    11.    12.    13.    14.    15.    16.    17.    18.    19.    20.
-char matriz[alto][ancho] = {{'\0'  ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  },
-/*                   1.*/   {'\0'  ,'\332','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\277','\0'  },
-/*              (1)  2.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                   3.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (2)  4.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                   5.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (3)  6.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                   7.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (4)  8.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                   9.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (5) 10.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                  11.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (6) 12.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                  13.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (7) 14.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                  15.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (8) 16.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                  17.*/   {'\0'  ,'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264','\0'  },
-/*              (9) 18.*/   {'\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  },
-/*                  19.*/   {'\0'  ,'\300','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\331','\0'  },
-/*             (10) 20.*/   {'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'\0'  ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'/'   ,'\0'  }};
+//                                   (1)           (2)           (3)           (4)          (5)           (6)           (7)           (8)           (9)
+// Matriz.                    0.     1.     2.     3.     4.     5.     6.     7.     8.    9.     10.    11.    12.    13.    14.    15.    16.    17.    18.
+char matriz[alto][ancho] = {{'\332','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\302','\304','\277'},
+/*              (1)  1.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                   2.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (2)  3.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                   4.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (3)  5.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                   6.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (4)  7.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                   8.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (5)  9.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                  10.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (6) 11.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                  12.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (7) 13.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                  14.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (8) 15.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                  16.*/   {'\303','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\305','\304','\264'},
+/*              (9) 17.*/   {'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263','\0'  ,'\263'},
+/*                  18.*/   {'\300','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\301','\304','\331'}};
 
 // Posición de los jugadores.
 struct Jugador
@@ -69,10 +66,11 @@ struct Jugador
    char cod;
    int posX;
    int posY;
+   int Bloq;
 }
-//            Cod    PosX   PosY
-Jugador_1 = {  P1  ,  5  ,  9  }, // Pos incial del jugador de arriba.
-Jugador_2 = {  P2  ,  5  ,  1  }; // Pos inicial del jugador de abajo.
+//            Cod   PosX  PosY   Bloq
+Jugador_1 = {  P1  ,  5  ,  9  ,  10  }, // Pos incial del jugador de arriba.
+Jugador_2 = {  P2  ,  5  ,  1  ,  10  }; // Pos inicial del jugador de abajo.
 
 // Posición de cada bloque.
 struct Bloquear
@@ -86,7 +84,7 @@ struct Bloquear
    int posY3;
 }
 //        Orientacion   posX1   posX2   posX3   posY1   posY2   posY3
-Bloque = {     b0     ,   1   ,   0   ,   0   ,   8   ,   0   ,   0  };
+Bloque = {     b0     ,   0   ,   0   ,   0   ,   9   ,   0   ,   0  };
 
 // Prototipos de Función
 void Posicionar_jugadores();
@@ -136,8 +134,8 @@ int main()
 // Agrega los caracteres que representan a cada jugador en la matriz.
 void Posicionar_jugadores()
 {
-   matriz[Jugador_1.posY * 2][Jugador_1.posX * 2] = P1;
-   matriz[Jugador_2.posY * 2][Jugador_2.posX * 2] = P2;
+   matriz[Jugador_1.posY * 2 - 1][Jugador_1.posX * 2 - 1] = P1;
+   matriz[Jugador_2.posY * 2 - 1][Jugador_2.posX * 2 - 1] = P2;
 }
 
 // Agrega los caracteres que representan a cada jugador en la matriz.
@@ -154,8 +152,8 @@ void Posicionar_bloques()
 // Agrega espacios vacios en las posiciones de los jugadores.
 void Limpiar_posiciones()
 {
-   matriz[Jugador_1.posY * 2][Jugador_1.posX * 2] = '\0';
-   matriz[Jugador_2.posY * 2][Jugador_2.posX * 2] = '\0';
+   matriz[Jugador_1.posY * 2 - 1][Jugador_1.posX * 2 - 1] = '\0';
+   matriz[Jugador_2.posY * 2 - 1][Jugador_2.posX * 2 - 1] = '\0';
 }
 
 // Hace aparecer un bloque de la nada.
@@ -190,7 +188,7 @@ void Orientar_bloques()
 {
    if(Bloque.Orientacion == bV || Bloque.Orientacion == b0) // Si la orientacion es vertical.
    {
-      if(Bloque.posY1 % 2 != 0) // Si es impar...
+      if(Bloque.posY1 % 2 == 0) // Si es impar...
       {
          Bloque.posX1--;
          Bloque.posY1--;
@@ -202,7 +200,7 @@ void Orientar_bloques()
    }
    else // Bloque.Orientacion == bH
    {
-      if(Bloque.posY1 % 2 == 0) // Si es par...
+      if(Bloque.posY1 % 2 != 0) // Si es par...
       {
          Bloque.posX1++;
          Bloque.posY1++;
@@ -315,6 +313,7 @@ void Caracter_bloque(char& a, char& b, char& c)
 // Muestra la matriz en la consola.
 void Dibujar_matriz(int turno)
 {
+   cout << "/(" << Jugador_2.Bloq << ")\n" ;
    for(int i=0; i<alto; i++) // i = posición y.
    {
       for(int j=0; j<ancho; j++) // j = posición x.
@@ -323,6 +322,7 @@ void Dibujar_matriz(int turno)
       }
       cout << '\n' ; // Imprime la siguiente fila un renglón abajo.
    }
+   cout << "\t      /(" << Jugador_1.Bloq << ")\n" ;
    Mostrar_el_turno(turno); // El mensaje debajo de la matriz con el turno.
 }
 
@@ -420,7 +420,16 @@ void Mover_Jugadores(Jugador& Player, Jugador& Oponente, int& i)
 
          case 'd' : Avance_Recto(Player, Oponente, Player.posX , RIGHT , 10 , i) ; break; // Derecha
 
-         case Blo : i-- ; return Aparecer_bloque();
+         case Blo : if(Player.Bloq > 0)
+                    {
+                       i--;
+                       return Aparecer_bloque();
+                    }
+                    else
+                    {
+                       tecla = '\0';
+                       return Mover_Jugadores(Player, Oponente, i);
+                    }
 
          case  L  : if(SaltoD != '\0') // SI el salto diagonal NO está desabilitado...
                     {
@@ -510,6 +519,7 @@ void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i)
       {
          if(!Bloque_Superpuesto()) // Mientras el bloque no esté superpuesto...
          {
+            Player.Bloq--;
             tecla = '\0'; // La condición if(tecla == Blo) en Mover_Jugadores dejará de cumplirse.
             Reiniciar_bloque();
             SaltoD = Determinar_diagonal(Player,Oponente); // Si el otro jugador estaba en una posición que
@@ -525,20 +535,60 @@ void Mover_bloque(Jugador& Player, Jugador& Oponente, int& i)
             // Se borran los bloques de la matriz.
             if(Key == Gir) //  Si Key es igual a la tecla que gira el bloque...
             {
-               Limpiar_bloques();
-               Cambiar_Orientacion();
-               Borrar_remanente();
+               if(Bloque.Orientacion == bV && Bloque.posX1 == 16 // Si es un bloque vertival en la columna 17
+                  ||
+                  Bloque.Orientacion == bH && Bloque.posX1 == 1) // o horizontal en la columna 2...
+               {
+                  return Mover_bloque(Player, Oponente, i);      // No puede girar el bloque.
+               }
+               else // De lo contrario sí puede girarlo.
+               {
+                  Limpiar_bloques();
+                  Cambiar_Orientacion();
+                  Borrar_remanente();
+               }
             }
             else
             {
                Limpiar_bloques();
-               Blo_Colindante(Key);
                switch(Key) // Desplazar bloque.
                {
-                  case 'w' : Bloque.posY1 -= 2; break;
-                  case 's' : Bloque.posY1 += 2; break;
-                  case 'a' : Bloque.posX1 -= 2; break;
-                  case 'd' : Bloque.posX1 += 2; break;
+                  case 'w' : if(Bloque.posY1 - 2 < 1) // Si presionar w generaría que el bloque se salga de la matriz...
+                             {
+                                return Mover_bloque(Player, Oponente, i); // El movimiento debería ser invalido y presionar de nuevo.
+                             }
+                             else // Si no es así la posición del bloque debería cambiar.
+                             {
+                                Blo_Colindante(Key);
+                                Bloque.posY1 -= 2; break;
+                             }
+                  case 's' : if(Bloque.posY1 + 2 > 16)
+                             {
+                                return Mover_bloque(Player, Oponente, i);
+                             }
+                             else
+                             {
+                                Blo_Colindante(Key);
+                                Bloque.posY1 += 2; break;
+                             }
+                  case 'a' : if(Bloque.posX1 - 2 < 1)
+                             {
+                                return Mover_bloque(Player, Oponente, i);
+                             }
+                             else
+                             {
+                                Blo_Colindante(Key);
+                                Bloque.posX1 -= 2; break;
+                             }
+                  case 'd' : if(Bloque.posX1 + 2 > 16)
+                             {
+                                return Mover_bloque(Player, Oponente, i);
+                             }
+                             else
+                             {
+                                Blo_Colindante(Key);
+                                Bloque.posX1 += 2; break;
+                             }
                   default  : return Mover_bloque(Player, Oponente, i);
                }
             }
@@ -905,7 +955,15 @@ bool Sin_ganadores()
 // Muestra quién ganó el juego
 void Pantalla_del_ganador()
 {
-   string ganador= "<jugador>";
+   char ganador;
+   if(Jugador_1.posY == 1)
+   {
+      ganador = P1;
+   }
+   else
+   {
+      ganador = P2;
+   }
    system("cls");
    cout << "\n\n\n\n\n\n\n\n\n\tFin del juego\n\nGanador: " << ganador << endl;
    getch();
